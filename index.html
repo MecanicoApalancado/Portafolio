@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portfolio Tracker · IOL</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:       #080c10;
+  --bg2:      #0e1318;
+  --bg3:      #141b22;
+  --border:   #1e2a35;
+  --border2:  #253040;
+  --accent:   #00d4aa;
+  --accent2:  #0099ff;
+  --accent3:  #ff6b35;
+  --green:    #00d4aa;
+  --red:      #ff4757;
+  --yellow:   #ffd32a;
+  --text:     #e8f0f8;
+  --text2:    #7a9bb5;
+  --text3:    #3d5a72;
+  --font-head: 'Syne', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font-mono);
+  font-size:13px;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* Animated background grid */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:
+    linear-gradient(rgba(0,212,170,.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,212,170,.03) 1px,transparent 1px);
+  background-size:60px 60px;
+  pointer-events:none;z-index:0;
+}
+body::after{
+  content:'';position:fixed;
+  top:-40%;left:-20%;width:60%;height:80%;
+  background:radial-gradient(ellipse,rgba(0,153,255,.04) 0%,transparent 70%);
+  pointer-events:none;z-index:0;
+}
+
+/* ── LAYOUT ── */
+.app{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:24px 20px}
+
+/* ── NAV ── */
+nav{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 24px;
+  background:rgba(14,19,24,.8);
+  border:1px solid var(--border);
+  backdrop-filter:blur(12px);
+  margin-bottom:28px;
+}
+.nav-brand{
+  font-family:var(--font-head);
+  font-size:18px;font-weight:800;
+  color:var(--accent);
+  letter-spacing:-.02em;
+  display:flex;align-items:center;gap:8px;
+}
+.nav-brand span{color:var(--text2);font-weight:400;font-size:13px}
+.nav-tabs{display:flex;gap:4px}
+.tab-btn{
+  background:none;border:1px solid transparent;
+  color:var(--text2);font-family:var(--font-mono);font-size:11px;
+  letter-spacing:.08em;text-transform:uppercase;
+  padding:7px 16px;cursor:pointer;transition:all .2s;
+}
+.tab-btn:hover{color:var(--text);border-color:var(--border2)}
+.tab-btn.active{
+  background:rgba(0,212,170,.1);
+  border-color:var(--accent);
+  color:var(--accent);
+}
+.nav-right{display:flex;align-items:center;gap:12px}
+.connection-dot{
+  width:8px;height:8px;border-radius:50%;
+  background:var(--text3);
+  transition:background .3s;
+}
+.connection-dot.connected{background:var(--green);box-shadow:0 0 8px var(--green)}
+.connection-dot.error{background:var(--red)}
+#last-update{font-size:10px;color:var(--text3)}
+
+/* ── SECTIONS ── */
+.section{display:none}
+.section.active{display:block;animation:fadeUp .3s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── LOGIN ── */
+.login-wrap{
+  max-width:420px;margin:80px auto;
+  background:var(--bg2);border:1px solid var(--border);
+  padding:40px;
+}
+.login-wrap h2{
+  font-family:var(--font-head);font-size:24px;font-weight:700;
+  margin-bottom:6px;
+}
+.login-wrap p{color:var(--text2);font-size:12px;margin-bottom:32px;line-height:1.6}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.field label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text2)}
+.field input{
+  background:var(--bg);border:1px solid var(--border2);
+  color:var(--text);font-family:var(--font-mono);font-size:13px;
+  padding:11px 14px;outline:none;transition:border-color .2s;
+}
+.field input:focus{border-color:var(--accent)}
+.field input::placeholder{color:var(--text3)}
+.btn-primary{
+  width:100%;background:var(--accent);border:none;
+  color:var(--bg);font-family:var(--font-mono);font-size:12px;
+  font-weight:500;letter-spacing:.1em;text-transform:uppercase;
+  padding:13px;cursor:pointer;transition:all .2s;margin-top:8px;
+}
+.btn-primary:hover{background:#00f0c0;box-shadow:0 0 20px rgba(0,212,170,.3)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.login-note{
+  margin-top:20px;padding:12px;
+  background:rgba(0,153,255,.06);border:1px solid rgba(0,153,255,.2);
+  font-size:11px;color:var(--text2);line-height:1.6;
+}
+.login-note strong{color:var(--accent2)}
+.error-msg{
+  color:var(--red);font-size:11px;margin-top:8px;
+  padding:10px;background:rgba(255,71,87,.08);border:1px solid rgba(255,71,87,.2);
+  display:none;
+}
+
+/* ── KPI ROW ── */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px}
+.kpi{
+  background:var(--bg2);border:1px solid var(--border);
+  padding:20px;position:relative;overflow:hidden;
+  transition:border-color .2s;
+}
+.kpi:hover{border-color:var(--border2)}
+.kpi::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--accent),transparent);
+}
+.kpi-label{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--text3);margin-bottom:8px}
+.kpi-value{
+  font-family:var(--font-head);font-size:26px;font-weight:700;
+  line-height:1;color:var(--text);
+}
+.kpi-value.pos{color:var(--green)}
+.kpi-value.neg{color:var(--red)}
+.kpi-sub{font-size:10px;color:var(--text2);margin-top:5px}
+
+/* ── GRID 2COL ── */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+@media(max-width:900px){.grid-2{grid-template-columns:1fr}}
+
+/* ── CARD ── */
+.card{
+  background:var(--bg2);border:1px solid var(--border);padding:24px;
+}
+.card-title{
+  font-family:var(--font-head);font-size:13px;font-weight:600;
+  letter-spacing:.04em;color:var(--text2);
+  margin-bottom:20px;display:flex;align-items:center;gap:8px;
+  text-transform:uppercase;font-size:11px;
+}
+.card-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ── CHARTS ── */
+.chart-wrap{position:relative;height:260px;display:flex;align-items:center;justify-content:center}
+
+/* ── TABLE ── */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead th{
+  font-size:9px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--text3);padding:8px 12px;
+  border-bottom:1px solid var(--border);text-align:left;
+  white-space:nowrap;
+}
+tbody td{
+  padding:11px 12px;border-bottom:1px solid rgba(30,42,53,.6);
+  color:var(--text2);font-size:12px;white-space:nowrap;
+}
+tbody td:first-child{color:var(--text);font-weight:500}
+tbody tr:hover td{background:rgba(0,212,170,.03)}
+tbody tr:last-child td{border-bottom:none}
+.badge{
+  display:inline-block;padding:2px 8px;font-size:10px;
+  border-radius:2px;font-weight:500;
+}
+.badge.pos{background:rgba(0,212,170,.12);color:var(--green)}
+.badge.neg{background:rgba(255,71,87,.12);color:var(--red)}
+.badge.neutral{background:rgba(122,155,181,.1);color:var(--text2)}
+.pos{color:var(--green)}
+.neg{color:var(--red)}
+
+/* ── COMPRAS FORM ── */
+.compras-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:16px}
+.btn-sm{
+  background:none;border:1px solid var(--accent);color:var(--accent);
+  font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;padding:9px 18px;cursor:pointer;transition:all .2s;
+}
+.btn-sm:hover{background:rgba(0,212,170,.1)}
+.btn-danger{border-color:var(--red);color:var(--red)}
+.btn-danger:hover{background:rgba(255,71,87,.1)}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+
+/* ── COMPRAS TABLE ── */
+.compras-section{margin-bottom:24px}
+
+/* ── SECTOR LEGEND ── */
+.sector-legend{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.legend-item{display:flex;align-items:center;gap:10px;font-size:11px}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.legend-name{color:var(--text2);flex:1}
+.legend-pct{color:var(--text);font-weight:500}
+
+/* ── HISTORIAL ── */
+.historial-filters{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.filter-select{
+  background:var(--bg);border:1px solid var(--border2);
+  color:var(--text);font-family:var(--font-mono);font-size:11px;
+  padding:7px 12px;outline:none;cursor:pointer;
+}
+
+/* ── LOADING ── */
+.loading{
+  display:flex;align-items:center;gap:8px;
+  color:var(--text2);font-size:11px;padding:20px;
+}
+.spinner{
+  width:16px;height:16px;border:2px solid var(--border2);
+  border-top-color:var(--accent);border-radius:50%;
+  animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── CERRAR POSICION MODAL ── */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(8,12,16,.85);
+  backdrop-filter:blur(4px);z-index:100;
+  display:none;align-items:center;justify-content:center;
+}
+.modal-overlay.open{display:flex}
+.modal{
+  background:var(--bg2);border:1px solid var(--border2);
+  padding:32px;width:100%;max-width:440px;
+  animation:fadeUp .2s ease;
+}
+.modal h3{font-family:var(--font-head);font-size:18px;margin-bottom:20px}
+.modal-actions{display:flex;gap:10px;margin-top:20px}
+
+/* ── EMPTY STATE ── */
+.empty{
+  text-align:center;padding:48px 20px;
+  color:var(--text3);
+}
+.empty-icon{font-size:40px;margin-bottom:12px}
+.empty p{font-size:12px;line-height:1.7}
+
+/* scrollbar */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- NAV -->
+<nav>
+  <div class="nav-brand">
+    ◈ PORTFOLIO
+    <span>/ IOL Tracker</span>
+  </div>
+  <div class="nav-tabs">
+    <button class="tab-btn active" onclick="showSection('dashboard')">Dashboard</button>
+    <button class="tab-btn" onclick="showSection('compras')">Compras</button>
+    <button class="tab-btn" onclick="showSection('historial')">Historial</button>
+    <button class="tab-btn" onclick="showSection('config')">Config</button>
+  </div>
+  <div class="nav-right">
+    <span id="last-update">—</span>
+    <div class="connection-dot" id="conn-dot"></div>
+    <button class="btn-sm" id="refresh-btn" onclick="refreshAll()" style="display:none">↻ Actualizar</button>
+  </div>
+</nav>
+
+<!-- ════ LOGIN ════ -->
+<div id="sec-config" class="section active">
+  <div class="login-wrap">
+    <h2>Conectar IOL</h2>
+    <p>Ingresá tus credenciales de Invertir Online para traer los precios automáticamente. Tus datos quedan solo en este navegador.</p>
+    <div class="field">
+      <label>Usuario / Email IOL</label>
+      <input type="text" id="iol-user" placeholder="tu@email.com">
+    </div>
+    <div class="field">
+      <label>Contraseña IOL</label>
+      <input type="password" id="iol-pass" placeholder="••••••••">
+    </div>
+    <div class="field">
+      <label>Comisión por defecto del broker (%)</label>
+      <input type="number" id="default-commission" placeholder="0.60" step="0.01" value="0.60">
+    </div>
+    <button class="btn-primary" id="login-btn" onclick="doLogin()">Conectar con IOL</button>
+    <div class="error-msg" id="login-error"></div>
+    <div class="login-note">
+      <strong>🔒 Privacidad:</strong> Tus credenciales se guardan solo en localStorage de tu navegador. Nunca se envían a ningún servidor externo salvo la API oficial de IOL (<code>api.invertironline.com</code>).
+    </div>
+
+    <div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--border)">
+      <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:12px">O continuar sin conectar (modo manual)</div>
+      <button class="btn-sm" onclick="skipLogin()" style="width:100%;padding:11px">Usar sin IOL (precio manual)</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ DASHBOARD ════ -->
+<div id="sec-dashboard" class="section">
+
+  <!-- KPIs -->
+  <div class="kpi-row" id="kpi-row">
+    <div class="kpi"><div class="kpi-label">Total Invertido</div><div class="kpi-value" id="kpi-invertido">—</div><div class="kpi-sub">USD neto con comisiones</div></div>
+    <div class="kpi"><div class="kpi-label">Valor Actual</div><div class="kpi-value" id="kpi-actual">—</div><div class="kpi-sub">Al dólar MEP actual</div></div>
+    <div class="kpi"><div class="kpi-label">Ganancia / Pérdida</div><div class="kpi-value" id="kpi-gp">—</div><div class="kpi-sub" id="kpi-gp-sub">—</div></div>
+    <div class="kpi"><div class="kpi-label">Rendimiento</div><div class="kpi-value" id="kpi-rend">—</div><div class="kpi-sub">Sobre capital invertido</div></div>
+    <div class="kpi"><div class="kpi-label">Posiciones</div><div class="kpi-value" id="kpi-pos">—</div><div class="kpi-sub" id="kpi-pos-sub">activos distintos</div></div>
+    <div class="kpi"><div class="kpi-label">Dólar MEP</div><div class="kpi-value" id="kpi-mep">—</div><div class="kpi-sub" id="kpi-mep-time">actualizar en config</div></div>
+  </div>
+
+  <!-- Charts -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">📊 Composición del portafolio</div>
+      <div class="chart-wrap"><canvas id="chart-portfolio"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">🏭 Composición por sector</div>
+      <div class="chart-wrap" style="height:auto">
+        <div style="width:100%">
+          <canvas id="chart-sector" style="max-height:200px"></canvas>
+          <div class="sector-legend" id="sector-legend"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Portafolio consolidado -->
+  <div class="card" style="margin-bottom:24px">
+    <div class="card-title">📋 Portafolio consolidado</div>
+    <div class="table-wrap" id="portfolio-table-wrap">
+      <div class="empty"><div class="empty-icon">📭</div><p>No hay compras registradas.<br>Andá a la sección <strong>Compras</strong> para agregar.</p></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ════ COMPRAS ════ -->
+<div id="sec-compras" class="section">
+  <div class="card compras-section">
+    <div class="card-title">➕ Nueva compra</div>
+    <div class="compras-grid">
+      <div class="field"><label>Fecha</label><input type="date" id="c-fecha"></div>
+      <div class="field"><label>Activo</label><input type="text" id="c-activo" placeholder="Ej: Bono AL30"></div>
+      <div class="field"><label>Ticker</label><input type="text" id="c-ticker" placeholder="Ej: AL30" style="text-transform:uppercase"></div>
+      <div class="field"><label>Broker</label><input type="text" id="c-broker" placeholder="Ej: IOL" value="IOL"></div>
+      <div class="field"><label>Sector</label>
+        <select id="c-sector" class="filter-select" style="width:100%;padding:11px 12px">
+          <option value="Bonos Soberanos">Bonos Soberanos</option>
+          <option value="Bonos CER">Bonos CER</option>
+          <option value="Letras">Letras</option>
+          <option value="Acciones AR">Acciones AR</option>
+          <option value="CEDEARs">CEDEARs</option>
+          <option value="Acciones USA">Acciones USA</option>
+          <option value="FCI / ETF">FCI / ETF</option>
+          <option value="Cripto">Cripto</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+      <div class="field"><label>Cantidad</label><input type="number" id="c-cantidad" placeholder="1000" step="any"></div>
+      <div class="field"><label>Precio compra (ARS)</label><input type="number" id="c-precio" placeholder="4500.00" step="any"></div>
+      <div class="field"><label>Dólar MEP compra (ARS)</label><input type="number" id="c-mep" placeholder="1200.00" step="any"></div>
+      <div class="field"><label>Comisión broker (%)</label><input type="number" id="c-comision" placeholder="0.60" step="0.01" value="0.60"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-sm" onclick="addCompra()">+ Registrar compra</button>
+      <button class="btn-sm" onclick="clearForm()">Limpiar</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📂 Historial de compras</div>
+    <div class="table-wrap" id="compras-table-wrap">
+      <div class="empty"><div class="empty-icon">🛒</div><p>Aún no registraste ninguna compra.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ HISTORIAL CIERRES ════ -->
+<div id="sec-historial" class="section">
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">📘 KPIs de operaciones cerradas</div>
+    <div class="kpi-row" style="margin-bottom:0" id="hist-kpis">
+      <div class="kpi"><div class="kpi-label">Ganancia Realizada</div><div class="kpi-value" id="h-gp">—</div></div>
+      <div class="kpi"><div class="kpi-label">Operaciones cerradas</div><div class="kpi-value" id="h-count">0</div></div>
+      <div class="kpi"><div class="kpi-label">Mejor operación</div><div class="kpi-value pos" id="h-best">—</div></div>
+      <div class="kpi"><div class="kpi-label">Peor operación</div><div class="kpi-value neg" id="h-worst">—</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📋 Operaciones cerradas</div>
+    <div class="table-wrap" id="historial-table-wrap">
+      <div class="empty"><div class="empty-icon">📗</div><p>Todavía no cerraste ninguna posición.<br>Para cerrar una, andá a <strong>Dashboard → Portafolio consolidado</strong> y presioná "Cerrar".</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ CERRAR POSICION MODAL ════ -->
+<div class="modal-overlay" id="close-modal">
+  <div class="modal">
+    <h3>Cerrar posición</h3>
+    <p style="color:var(--text2);font-size:12px;margin-bottom:20px">Ingresá el precio y el MEP al que vendiste para registrar el cierre.</p>
+    <div class="field"><label>Ticker</label><input type="text" id="m-ticker" readonly style="opacity:.6"></div>
+    <div class="field"><label>Fecha de venta</label><input type="date" id="m-fecha"></div>
+    <div class="field"><label>Precio de venta (ARS)</label><input type="number" id="m-precio" placeholder="5200.00" step="any"></div>
+    <div class="field"><label>Dólar MEP venta (ARS)</label><input type="number" id="m-mep" placeholder="1350.00" step="any"></div>
+    <div class="field"><label>Comisión venta (%)</label><input type="number" id="m-comision" placeholder="0.60" step="0.01" value="0.60"></div>
+    <div class="modal-actions">
+      <button class="btn-sm" onclick="confirmClose()">Confirmar cierre</button>
+      <button class="btn-sm btn-danger" onclick="closeModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /app -->
+
+<script>
+// ══════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════
+let state = {
+  token: null,
+  tokenExpiry: null,
+  compras: [],       // all buy records
+  cierres: [],       // closed positions
+  prices: {},        // { ticker: { price, currency } }
+  mepActual: null,
+  iolUser: '',
+  iolPass: '',
+  defaultCommission: 0.60,
+  manualMode: false,
+};
+
+// Sector colors
+const SECTOR_COLORS = {
+  "Bonos Soberanos": "#00d4aa",
+  "Bonos CER":       "#0099ff",
+  "Letras":          "#7b68ee",
+  "Acciones AR":     "#ff6b35",
+  "CEDEARs":         "#ffd32a",
+  "Acciones USA":    "#ff4757",
+  "FCI / ETF":       "#2ed573",
+  "Cripto":          "#ff6348",
+  "Otro":            "#57606f",
+};
+
+const PORTFOLIO_COLORS = [
+  "#00d4aa","#0099ff","#ff6b35","#ffd32a","#ff4757",
+  "#7b68ee","#2ed573","#ff6348","#a29bfe","#fd79a8",
+  "#00cec9","#e17055","#74b9ff","#55efc4","#fdcb6e"
+];
+
+// Charts
+let chartPortfolio = null;
+let chartSector = null;
+
+// ══════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════
+window.onload = () => {
+  loadState();
+  document.getElementById('c-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('m-fecha').value = new Date().toISOString().split('T')[0];
+
+  if (state.iolUser && state.iolPass) {
+    showSection('dashboard');
+    refreshAll();
+  } else if (state.manualMode) {
+    showSection('dashboard');
+    renderAll();
+  } else {
+    showSection('config');
+  }
+};
+
+// ══════════════════════════════════════════════
+// PERSISTENCE
+// ══════════════════════════════════════════════
+function saveState() {
+  localStorage.setItem('portfolio_state', JSON.stringify({
+    compras: state.compras,
+    cierres: state.cierres,
+    mepActual: state.mepActual,
+    iolUser: state.iolUser,
+    iolPass: state.iolPass,
+    defaultCommission: state.defaultCommission,
+    manualMode: state.manualMode,
+  }));
+}
+
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem('portfolio_state') || '{}');
+    state.compras = s.compras || [];
+    state.cierres = s.cierres || [];
+    state.mepActual = s.mepActual || null;
+    state.iolUser = s.iolUser || '';
+    state.iolPass = s.iolPass || '';
+    state.defaultCommission = s.defaultCommission ?? 0.60;
+    state.manualMode = s.manualMode || false;
+    if (state.iolUser) document.getElementById('iol-user').value = state.iolUser;
+    if (state.iolPass) document.getElementById('iol-pass').value = '••••••••';
+    document.getElementById('default-commission').value = state.defaultCommission;
+    if (state.mepActual) document.getElementById('kpi-mep').textContent = '$' + fmt2(state.mepActual);
+  } catch(e) {}
+}
+
+// ══════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('sec-' + name).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    if (b.textContent.toLowerCase().includes(name === 'config' ? 'config' :
+        name === 'compras' ? 'compra' :
+        name === 'historial' ? 'historial' : 'dashboard')) {
+      b.classList.add('active');
+    }
+  });
+  if (name === 'dashboard') renderAll();
+  if (name === 'compras') renderComprasTable();
+  if (name === 'historial') renderHistorial();
+}
+
+// ══════════════════════════════════════════════
+// IOL AUTH
+// ══════════════════════════════════════════════
+async function doLogin() {
+  const user = document.getElementById('iol-user').value.trim();
+  const pass = document.getElementById('iol-pass').value;
+  const commission = parseFloat(document.getElementById('default-commission').value) || 0.60;
+
+  if (!user || !pass) { showError('Completá usuario y contraseña.'); return; }
+
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true;
+  btn.textContent = 'Conectando...';
+  document.getElementById('login-error').style.display = 'none';
+
+  try {
+    const token = await getIOLToken(user, pass);
+    state.token = token;
+    state.iolUser = user;
+    state.iolPass = pass;
+    state.defaultCommission = commission;
+    state.manualMode = false;
+    saveState();
+
+    setConnected(true);
+    document.getElementById('refresh-btn').style.display = 'block';
+    showSection('dashboard');
+    await refreshAll();
+  } catch(e) {
+    showError('No se pudo conectar con IOL: ' + e.message + '. Verificá tus credenciales o usá el modo manual.');
+    btn.disabled = false;
+    btn.textContent = 'Conectar con IOL';
+  }
+}
+
+async function getIOLToken(user, pass) {
+  const resp = await fetch('https://api.invertironline.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}&grant_type=password`
+  });
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  const data = await resp.json();
+  if (!data.access_token) throw new Error('Token no recibido');
+  state.tokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
+  return data.access_token;
+}
+
+async function ensureToken() {
+  if (!state.token || Date.now() > state.tokenExpiry) {
+    if (state.iolUser && state.iolPass) {
+      state.token = await getIOLToken(state.iolUser, state.iolPass);
+    } else {
+      throw new Error('Sin credenciales');
+    }
+  }
+  return state.token;
+}
+
+function skipLogin() {
+  state.manualMode = true;
+  state.defaultCommission = parseFloat(document.getElementById('default-commission').value) || 0.60;
+  saveState();
+  document.getElementById('refresh-btn').style.display = 'block';
+  showSection('dashboard');
+  renderAll();
+}
+
+function showError(msg) {
+  const el = document.getElementById('login-error');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function setConnected(ok) {
+  const dot = document.getElementById('conn-dot');
+  dot.className = 'connection-dot ' + (ok ? 'connected' : 'error');
+}
+
+// ══════════════════════════════════════════════
+// IOL PRICE FETCH
+// ══════════════════════════════════════════════
+async function fetchPrice(ticker) {
+  try {
+    const token = await ensureToken();
+    // Try BCBA first, then NYSE
+    for (const mercado of ['bCBA', 'nYSE', 'nASDAQ']) {
+      try {
+        const resp = await fetch(
+          `https://api.invertironline.com/api/v2/${mercado}/Titulos/${ticker}/Cotizacion`,
+          { headers: { Authorization: 'Bearer ' + token } }
+        );
+        if (resp.ok) {
+          const d = await resp.json();
+          const price = d.ultimoPrecio || d.ultimo || d.precioUltimo || 0;
+          if (price > 0) return { price, mercado };
+        }
+      } catch(e) {}
+    }
+  } catch(e) {}
+  return null;
+}
+
+async function fetchMEP() {
+  try {
+    const token = await ensureToken();
+    // AL30D / GD30D son los más usados para MEP
+    for (const ticker of ['AL30D','GD30D','AY24D']) {
+      try {
+        const resp = await fetch(
+          `https://api.invertironline.com/api/v2/bCBA/Titulos/${ticker}/Cotizacion`,
+          { headers: { Authorization: 'Bearer ' + token } }
+        );
+        if (resp.ok) {
+          const d = await resp.json();
+          const p = d.ultimoPrecio || d.ultimo || 0;
+          if (p > 0) return p;
+        }
+      } catch(e) {}
+    }
+  } catch(e) {}
+  return null;
+}
+
+async function refreshAll() {
+  if (state.manualMode) { renderAll(); return; }
+
+  document.getElementById('refresh-btn').textContent = '↻ Actualizando...';
+  document.getElementById('refresh-btn').disabled = true;
+
+  try {
+    // Refresh MEP
+    const mep = await fetchMEP();
+    if (mep) {
+      state.mepActual = mep;
+      saveState();
+    }
+
+    // Get unique tickers from open positions
+    const tickers = [...new Set(state.compras
+      .filter(c => !c.closed)
+      .map(c => c.ticker.toUpperCase()))];
+
+    for (const ticker of tickers) {
+      const result = await fetchPrice(ticker);
+      if (result) state.prices[ticker] = result;
+    }
+
+    setConnected(true);
+    document.getElementById('last-update').textContent =
+      'Act. ' + new Date().toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit'});
+  } catch(e) {
+    setConnected(false);
+  }
+
+  document.getElementById('refresh-btn').textContent = '↻ Actualizar';
+  document.getElementById('refresh-btn').disabled = false;
+  renderAll();
+}
+
+// ══════════════════════════════════════════════
+// COMPRAS CRUD
+// ══════════════════════════════════════════════
+function addCompra() {
+  const fecha    = document.getElementById('c-fecha').value;
+  const activo   = document.getElementById('c-activo').value.trim();
+  const ticker   = document.getElementById('c-ticker').value.trim().toUpperCase();
+  const broker   = document.getElementById('c-broker').value.trim();
+  const sector   = document.getElementById('c-sector').value;
+  const cantidad = parseFloat(document.getElementById('c-cantidad').value);
+  const precio   = parseFloat(document.getElementById('c-precio').value);
+  const mep      = parseFloat(document.getElementById('c-mep').value);
+  const comision = parseFloat(document.getElementById('c-comision').value) / 100;
+
+  if (!fecha || !activo || !ticker || !cantidad || !precio || !mep) {
+    alert('Completá todos los campos obligatorios (fecha, activo, ticker, cantidad, precio y MEP).'); return;
+  }
+
+  const invBruta = cantidad * precio;
+  const comisionARS = invBruta * comision;
+  const invNeta = invBruta + comisionARS;
+  const invUSD = invNeta / mep;
+
+  state.compras.push({
+    id: Date.now(),
+    fecha, activo, ticker, broker, sector,
+    cantidad, precio, mep, comision,
+    invBruta, comisionARS, invNeta, invUSD,
+    closed: false,
+  });
+  saveState();
+  clearForm();
+  renderComprasTable();
+
+  // Fetch price for new ticker
+  if (!state.manualMode) {
+    fetchPrice(ticker).then(r => {
+      if (r) { state.prices[ticker] = r; renderAll(); }
+    });
+  }
+}
+
+function deleteCompra(id) {
+  if (!confirm('¿Eliminar esta compra?')) return;
+  state.compras = state.compras.filter(c => c.id !== id);
+  saveState();
+  renderComprasTable();
+  renderAll();
+}
+
+function clearForm() {
+  ['c-activo','c-ticker','c-cantidad','c-precio','c-mep'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('c-broker').value = 'IOL';
+  document.getElementById('c-comision').value = state.defaultCommission || 0.60;
+  document.getElementById('c-fecha').value = new Date().toISOString().split('T')[0];
+}
+
+// ══════════════════════════════════════════════
+// PORTFOLIO CONSOLIDATION
+// ══════════════════════════════════════════════
+function getConsolidated() {
+  const open = state.compras.filter(c => !c.closed);
+  const byTicker = {};
+
+  open.forEach(c => {
+    if (!byTicker[c.ticker]) {
+      byTicker[c.ticker] = {
+        ticker: c.ticker,
+        activo: c.activo,
+        sector: c.sector,
+        broker: c.broker,
+        totalCantidad: 0,
+        totalInvUSD: 0,
+        totalInvARS: 0,
+        compras: [],
+        precioPromARS: 0,
+        mepPromCompra: 0,
+      };
+    }
+    const b = byTicker[c.ticker];
+    b.totalCantidad += c.cantidad;
+    b.totalInvUSD   += c.invUSD;
+    b.totalInvARS   += c.invNeta;
+    b.compras.push(c);
+  });
+
+  // Weighted average price & MEP
+  Object.values(byTicker).forEach(b => {
+    const totalCant = b.compras.reduce((a,c) => a + c.cantidad, 0);
+    b.precioPromARS = b.compras.reduce((a,c) => a + c.precio * c.cantidad, 0) / totalCant;
+    b.mepPromCompra = b.totalInvARS / b.totalInvUSD; // effective MEP
+
+    // Current value
+    const priceData = state.prices[b.ticker];
+    const currentPriceARS = priceData ? priceData.price : null;
+    const mepActual = state.mepActual;
+
+    if (currentPriceARS && mepActual) {
+      b.valorActualARS = b.totalCantidad * currentPriceARS;
+      b.valorActualUSD = b.valorActualARS / mepActual;
+      b.gpUSD = b.valorActualUSD - b.totalInvUSD;
+      b.rendPct = b.gpUSD / b.totalInvUSD;
+      b.currentPriceARS = currentPriceARS;
+    } else {
+      b.valorActualUSD = null;
+      b.gpUSD = null;
+      b.rendPct = null;
+      b.currentPriceARS = currentPriceARS;
+    }
+  });
+
+  return Object.values(byTicker);
+}
+
+// ══════════════════════════════════════════════
+// RENDER ALL
+// ══════════════════════════════════════════════
+function renderAll() {
+  const consolidated = getConsolidated();
+  renderKPIs(consolidated);
+  renderPortfolioTable(consolidated);
+  renderCharts(consolidated);
+}
+
+function renderKPIs(consolidated) {
+  const totalInv = consolidated.reduce((a,b) => a + b.totalInvUSD, 0);
+  const totalActual = consolidated.reduce((a,b) => a + (b.valorActualUSD || 0), 0);
+  const gp = totalActual - totalInv;
+  const rend = totalInv > 0 ? gp / totalInv : 0;
+  const posPositivas = consolidated.filter(b => b.gpUSD > 0).length;
+  const posNegativas = consolidated.filter(b => b.gpUSD < 0).length;
+
+  document.getElementById('kpi-invertido').textContent = totalInv > 0 ? 'USD ' + fmt2(totalInv) : '—';
+  document.getElementById('kpi-actual').textContent = totalActual > 0 ? 'USD ' + fmt2(totalActual) : '—';
+
+  const gpEl = document.getElementById('kpi-gp');
+  gpEl.textContent = totalInv > 0 ? (gp >= 0 ? '+' : '') + 'USD ' + fmt2(gp) : '—';
+  gpEl.className = 'kpi-value ' + (gp >= 0 ? 'pos' : 'neg');
+  document.getElementById('kpi-gp-sub').textContent =
+    posPositivas + ' pos. · ' + posNegativas + ' neg.';
+
+  const rendEl = document.getElementById('kpi-rend');
+  rendEl.textContent = totalInv > 0 ? (rend >= 0 ? '+' : '') + (rend*100).toFixed(2) + '%' : '—';
+  rendEl.className = 'kpi-value ' + (rend >= 0 ? 'pos' : 'neg');
+
+  document.getElementById('kpi-pos').textContent = consolidated.length || '—';
+
+  const mepEl = document.getElementById('kpi-mep');
+  if (state.mepActual) {
+    mepEl.textContent = '$' + fmt2(state.mepActual);
+    document.getElementById('kpi-mep-time').textContent = 'dólar MEP actual';
+  }
+}
+
+function renderPortfolioTable(consolidated) {
+  const wrap = document.getElementById('portfolio-table-wrap');
+  if (consolidated.length === 0) {
+    wrap.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>No hay posiciones abiertas.<br>Registrá tus compras en la sección <strong>Compras</strong>.</p></div>';
+    return;
+  }
+
+  let html = `<table>
+    <thead><tr>
+      <th>Ticker</th><th>Activo</th><th>Sector</th>
+      <th>Cantidad</th><th>Precio prom.</th><th>Precio actual</th>
+      <th>Inv. USD</th><th>Valor actual USD</th>
+      <th>G/P USD</th><th>Rend. %</th><th>Acción</th>
+    </tr></thead><tbody>`;
+
+  consolidated.forEach(b => {
+    const gpStr = b.gpUSD !== null
+      ? `<span class="${b.gpUSD >= 0 ? 'pos' : 'neg'}">${b.gpUSD >= 0 ? '+' : ''}USD ${fmt2(b.gpUSD)}</span>`
+      : '<span style="color:var(--text3)">Cargar precio</span>';
+    const rendStr = b.rendPct !== null
+      ? `<span class="badge ${b.rendPct >= 0 ? 'pos' : 'neg'}">${b.rendPct >= 0 ? '+' : ''}${(b.rendPct*100).toFixed(2)}%</span>`
+      : '—';
+    const precioActual = b.currentPriceARS
+      ? '$' + fmt2(b.currentPriceARS)
+      : `<input type="number" placeholder="ARS" style="width:90px;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:4px 8px;font-family:var(--font-mono);font-size:11px" onchange="setManualPrice('${b.ticker}',this.value)">`;
+
+    html += `<tr>
+      <td style="font-weight:700;color:var(--accent)">${b.ticker}</td>
+      <td>${b.activo}</td>
+      <td><span class="badge neutral">${b.sector}</span></td>
+      <td>${fmtN(b.totalCantidad)}</td>
+      <td>$${fmt2(b.precioPromARS)}</td>
+      <td>${precioActual}</td>
+      <td>USD ${fmt2(b.totalInvUSD)}</td>
+      <td>${b.valorActualUSD !== null ? 'USD ' + fmt2(b.valorActualUSD) : '<span style="color:var(--text3)">—</span>'}</td>
+      <td>${gpStr}</td>
+      <td>${rendStr}</td>
+      <td><button class="btn-sm" style="font-size:10px;padding:5px 10px" onclick="openCloseModal('${b.ticker}')">Cerrar</button></td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+
+  // MEP manual input if no IOL
+  if (!state.mepActual && state.manualMode) {
+    wrap.insertAdjacentHTML('afterbegin', `
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:12px;background:rgba(0,153,255,.06);border:1px solid rgba(0,153,255,.2)">
+        <span style="font-size:11px;color:var(--text2)">Dólar MEP actual:</span>
+        <input type="number" id="mep-manual-input" placeholder="1350.00" value="${state.mepActual||''}"
+          style="width:120px;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:6px 10px;font-family:var(--font-mono);font-size:12px"
+          onchange="setMEP(this.value)">
+        <span style="font-size:10px;color:var(--text3)">Ingresalo para calcular valores en USD</span>
+      </div>`);
+  }
+}
+
+function setManualPrice(ticker, value) {
+  const v = parseFloat(value);
+  if (v > 0) {
+    state.prices[ticker] = { price: v, mercado: 'manual' };
+    renderAll();
+  }
+}
+
+function setMEP(value) {
+  const v = parseFloat(value);
+  if (v > 0) {
+    state.mepActual = v;
+    saveState();
+    renderAll();
+  }
+}
+
+// ══════════════════════════════════════════════
+// CHARTS
+// ══════════════════════════════════════════════
+function renderCharts(consolidated) {
+  renderPortfolioChart(consolidated);
+  renderSectorChart(consolidated);
+}
+
+function renderPortfolioChart(consolidated) {
+  const ctx = document.getElementById('chart-portfolio').getContext('2d');
+
+  const data = consolidated.map(b => b.valorActualUSD || b.totalInvUSD);
+  const labels = consolidated.map(b => b.ticker);
+  const total = data.reduce((a,b) => a+b, 0);
+
+  if (chartPortfolio) chartPortfolio.destroy();
+
+  if (consolidated.length === 0) {
+    ctx.clearRect(0,0,300,300);
+    return;
+  }
+
+  chartPortfolio = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: PORTFOLIO_COLORS.slice(0, data.length),
+        borderColor: '#0e1318',
+        borderWidth: 3,
+        hoverBorderWidth: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '65%',
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: {
+            color: '#7a9bb5',
+            font: { family: "'JetBrains Mono'", size: 11 },
+            padding: 12,
+            usePointStyle: true,
+            generateLabels(chart) {
+              const ds = chart.data.datasets[0];
+              return chart.data.labels.map((label, i) => ({
+                text: label + '  ' + ((ds.data[i]/total*100).toFixed(1)) + '%',
+                fillStyle: ds.backgroundColor[i],
+                strokeStyle: ds.backgroundColor[i],
+                pointStyle: 'circle',
+                index: i,
+              }));
+            }
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => ` USD ${fmt2(ctx.raw)}  (${(ctx.raw/total*100).toFixed(1)}%)`
+          },
+          backgroundColor: '#141b22',
+          borderColor: '#1e2a35',
+          borderWidth: 1,
+          titleColor: '#e8f0f8',
+          bodyColor: '#7a9bb5',
+          padding: 12,
+        }
+      }
+    }
+  });
+}
+
+function renderSectorChart(consolidated) {
+  const ctx = document.getElementById('chart-sector').getContext('2d');
+
+  const sectorMap = {};
+  consolidated.forEach(b => {
+    const v = b.valorActualUSD || b.totalInvUSD;
+    sectorMap[b.sector] = (sectorMap[b.sector] || 0) + v;
+  });
+
+  const labels = Object.keys(sectorMap);
+  const data   = Object.values(sectorMap);
+  const colors = labels.map(l => SECTOR_COLORS[l] || '#57606f');
+  const total  = data.reduce((a,b) => a+b, 0);
+
+  if (chartSector) chartSector.destroy();
+
+  if (labels.length === 0) return;
+
+  chartSector = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: colors,
+        borderColor: '#0e1318',
+        borderWidth: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => ` USD ${fmt2(ctx.raw)}  (${(ctx.raw/total*100).toFixed(1)}%)`
+          },
+          backgroundColor: '#141b22',
+          borderColor: '#1e2a35',
+          borderWidth: 1,
+          titleColor: '#e8f0f8',
+          bodyColor: '#7a9bb5',
+          padding: 12,
+        }
+      }
+    }
+  });
+
+  // Legend
+  const legend = document.getElementById('sector-legend');
+  legend.innerHTML = labels.map((l, i) => `
+    <div class="legend-item">
+      <div class="legend-dot" style="background:${colors[i]}"></div>
+      <span class="legend-name">${l}</span>
+      <span class="legend-pct">${(data[i]/total*100).toFixed(1)}%</span>
+      <span style="color:var(--text3);font-size:10px">USD ${fmt2(data[i])}</span>
+    </div>
+  `).join('');
+}
+
+// ══════════════════════════════════════════════
+// COMPRAS TABLE
+// ══════════════════════════════════════════════
+function renderComprasTable() {
+  const wrap = document.getElementById('compras-table-wrap');
+  const open = state.compras.filter(c => !c.closed);
+
+  if (open.length === 0) {
+    wrap.innerHTML = '<div class="empty"><div class="empty-icon">🛒</div><p>Aún no registraste ninguna compra.</p></div>';
+    return;
+  }
+
+  let html = `<table>
+    <thead><tr>
+      <th>Fecha</th><th>Ticker</th><th>Activo</th><th>Sector</th><th>Broker</th>
+      <th>Cantidad</th><th>Precio ARS</th><th>MEP compra</th>
+      <th>Inv. ARS neta</th><th>Inv. USD</th><th></th>
+    </tr></thead><tbody>`;
+
+  open.sort((a,b) => new Date(b.fecha) - new Date(a.fecha)).forEach(c => {
+    html += `<tr>
+      <td>${c.fecha}</td>
+      <td style="color:var(--accent);font-weight:700">${c.ticker}</td>
+      <td>${c.activo}</td>
+      <td><span class="badge neutral">${c.sector}</span></td>
+      <td>${c.broker}</td>
+      <td>${fmtN(c.cantidad)}</td>
+      <td>$${fmt2(c.precio)}</td>
+      <td>$${fmt2(c.mep)}</td>
+      <td>$${fmt2(c.invNeta)}</td>
+      <td style="color:var(--accent2)">USD ${fmt2(c.invUSD)}</td>
+      <td><button class="btn-sm btn-danger" style="font-size:10px;padding:4px 10px" onclick="deleteCompra(${c.id})">✕</button></td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════
+// CLOSE POSITION
+// ══════════════════════════════════════════════
+let closingTicker = null;
+
+function openCloseModal(ticker) {
+  closingTicker = ticker;
+  document.getElementById('m-ticker').value = ticker;
+  document.getElementById('m-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('m-precio').value = '';
+  document.getElementById('m-mep').value = state.mepActual || '';
+  document.getElementById('m-comision').value = state.defaultCommission || 0.60;
+  document.getElementById('close-modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('close-modal').classList.remove('open');
+  closingTicker = null;
+}
+
+function confirmClose() {
+  const fecha    = document.getElementById('m-fecha').value;
+  const precio   = parseFloat(document.getElementById('m-precio').value);
+  const mep      = parseFloat(document.getElementById('m-mep').value);
+  const comision = parseFloat(document.getElementById('m-comision').value) / 100;
+
+  if (!fecha || !precio || !mep) { alert('Completá todos los campos.'); return; }
+
+  // Get consolidated position for this ticker
+  const consolidated = getConsolidated();
+  const pos = consolidated.find(b => b.ticker === closingTicker);
+  if (!pos) { closeModal(); return; }
+
+  const ventaBruta = pos.totalCantidad * precio;
+  const comisionVenta = ventaBruta * comision;
+  const ventaNeta = ventaBruta - comisionVenta;
+  const ventaUSD = ventaNeta / mep;
+  const gpUSD = ventaUSD - pos.totalInvUSD;
+  const rendPct = gpUSD / pos.totalInvUSD;
+
+  state.cierres.push({
+    id: Date.now(),
+    ticker: closingTicker,
+    activo: pos.activo,
+    sector: pos.sector,
+    fechaCierre: fecha,
+    cantidad: pos.totalCantidad,
+    precioVenta: precio,
+    mepVenta: mep,
+    comisionVenta: comision,
+    invUSD: pos.totalInvUSD,
+    ventaUSD,
+    gpUSD,
+    rendPct,
+    compras: pos.compras.map(c => c.id),
+  });
+
+  // Mark compras as closed
+  state.compras.forEach(c => {
+    if (c.ticker === closingTicker) c.closed = true;
+  });
+
+  saveState();
+  closeModal();
+  renderAll();
+  renderHistorial();
+}
+
+// ══════════════════════════════════════════════
+// HISTORIAL
+// ══════════════════════════════════════════════
+function renderHistorial() {
+  const wrap = document.getElementById('historial-table-wrap');
+
+  if (state.cierres.length === 0) {
+    wrap.innerHTML = '<div class="empty"><div class="empty-icon">📗</div><p>Todavía no cerraste ninguna posición.</p></div>';
+    document.getElementById('h-gp').textContent = '—';
+    document.getElementById('h-count').textContent = '0';
+    document.getElementById('h-best').textContent = '—';
+    document.getElementById('h-worst').textContent = '—';
+    return;
+  }
+
+  const totalGP = state.cierres.reduce((a,c) => a + c.gpUSD, 0);
+  const best = state.cierres.reduce((a,c) => c.rendPct > a.rendPct ? c : a);
+  const worst = state.cierres.reduce((a,c) => c.rendPct < a.rendPct ? c : a);
+
+  document.getElementById('h-gp').textContent = (totalGP >= 0 ? '+' : '') + 'USD ' + fmt2(totalGP);
+  document.getElementById('h-gp').className = 'kpi-value ' + (totalGP >= 0 ? 'pos' : 'neg');
+  document.getElementById('h-count').textContent = state.cierres.length;
+  document.getElementById('h-best').textContent = best.ticker + ' +' + (best.rendPct*100).toFixed(2) + '%';
+  document.getElementById('h-worst').textContent = worst.ticker + ' ' + (worst.rendPct*100).toFixed(2) + '%';
+
+  let html = `<table>
+    <thead><tr>
+      <th>Fecha cierre</th><th>Ticker</th><th>Activo</th><th>Sector</th>
+      <th>Cantidad</th><th>Precio venta</th><th>MEP venta</th>
+      <th>Inv. USD</th><th>Venta USD</th><th>G/P USD</th><th>Rendimiento</th>
+    </tr></thead><tbody>`;
+
+  state.cierres.sort((a,b) => new Date(b.fechaCierre) - new Date(a.fechaCierre)).forEach(c => {
+    const cls = c.gpUSD >= 0 ? 'pos' : 'neg';
+    html += `<tr>
+      <td>${c.fechaCierre}</td>
+      <td style="color:var(--accent);font-weight:700">${c.ticker}</td>
+      <td>${c.activo}</td>
+      <td><span class="badge neutral">${c.sector}</span></td>
+      <td>${fmtN(c.cantidad)}</td>
+      <td>$${fmt2(c.precioVenta)}</td>
+      <td>$${fmt2(c.mepVenta)}</td>
+      <td>USD ${fmt2(c.invUSD)}</td>
+      <td>USD ${fmt2(c.ventaUSD)}</td>
+      <td><span class="${cls}">${c.gpUSD >= 0 ? '+' : ''}USD ${fmt2(c.gpUSD)}</span></td>
+      <td><span class="badge ${cls}">${c.rendPct >= 0 ? '+' : ''}${(c.rendPct*100).toFixed(2)}%</span></td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════
+function fmt2(n) {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  return Math.abs(n).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtN(n) {
+  return n.toLocaleString('es-AR', { maximumFractionDigits: 4 });
+}
+</script>
+</body>
+</html>
