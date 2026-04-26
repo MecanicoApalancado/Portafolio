@@ -644,9 +644,23 @@ function getConsolidated() {
     b.precioPromARS=b.compras.reduce((a,c)=>a+c.precio*c.cantidad,0)/tot;
     b.mepProm=b.totalInvARS/b.totalInvUSD;
     const pd=state.prices[b.ticker]; const cur=pd?pd.price:null; const mep=state.mepActual;
-    if(cur&&mep){
-      b.valorActualARS=b.totalCantidad*cur; b.valorActualUSD=b.valorActualARS/mep;
-      b.gpUSD=b.valorActualUSD-b.totalInvUSD; b.rendPct=b.gpUSD/b.totalInvUSD; b.currentPriceARS=cur;
+    // CEDEARs con D (ej: MSFTD) cotizan en USD en IOL — precio ya viene en USD
+    const tickerEnUSD = b.ticker.endsWith('D') && cur && cur < 5000;
+    if(cur){
+      if(tickerEnUSD){
+        // precio en USD directamente
+        b.valorActualUSD=b.totalCantidad*cur;
+        b.currentPriceARS=mep ? cur*mep : null;
+      } else if(mep){
+        // precio en ARS, convertir por MEP
+        b.valorActualARS=b.totalCantidad*cur;
+        b.valorActualUSD=b.valorActualARS/mep;
+        b.currentPriceARS=cur;
+      }
+      if(b.valorActualUSD!=null){
+        b.gpUSD=b.valorActualUSD-b.totalInvUSD;
+        b.rendPct=b.gpUSD/b.totalInvUSD;
+      } else { b.valorActualUSD=null; b.gpUSD=null; b.rendPct=null; }
     } else { b.valorActualUSD=null; b.gpUSD=null; b.rendPct=null; b.currentPriceARS=cur; }
   });
   return Object.values(byT);
