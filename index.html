@@ -331,6 +331,7 @@ tbody tr:hover td{background:rgba(26,110,245,.025)}
       <input type="number" id="snap-mep" placeholder="MEP actual (ARS)" style="width:180px;background:var(--bg);border:1.5px solid var(--border2);color:var(--text);padding:7px 12px;font-family:var(--font);font-size:12px;font-weight:600;border-radius:6px;outline:none">
       <button class="btn-sm" style="padding:7px 18px" onclick="takeSnapshot()">+ Guardar</button>
       <span style="margin-left:auto;font-size:10px;color:var(--text3)">Guardá periódicamente para ver el crecimiento histórico</span>
+      <button class="btn-sm" id="btn-build-history" style="padding:7px 18px;border-color:#9b59f5;color:#9b59f5;margin-left:8px" onclick="buildHistoricalEvolution()">📊 Reconstruir evolución histórica</button>
     </div>
     <div style="height:300px"><canvas id="chart-evolution"></canvas></div>
   </div>
@@ -927,6 +928,144 @@ function importarPortafolio() {
   showSection('dashboard');
   refreshAll();
 }
+
+// ── RECONSTRUIR EVOLUCIÓN HISTÓRICA ──
+async function buildHistoricalEvolution() {
+  if (state.manualMode) { alert('Necesitás estar conectado con IOL para esta función.'); return; }
+
+  const btn = document.getElementById('btn-build-history');
+  btn.textContent = '⏳ Calculando...'; btn.disabled = true;
+
+  try {
+    const tok = await ensureToken();
+
+    // Get all unique tickers from open compras
+    const tickers = [...new Set(state.compras.filter(c=>!c.closed).map(c=>c.ticker))];
+
+    // Date range: first purchase to today
+    const allDates = state.compras.filter(c=>!c.closed).map(c=>c.fecha).filter(d=>d&&d.length===10);
+    const firstDate = allDates.sort()[0];
+    const today = new Date().toISOString().split('T')[0];
+
+    // Fetch historical prices for each ticker
+    const historicalPrices = {}; // { ticker: { date: price } }
+    for (const ticker of tickers) {
+      try {
+        const url = `https://iol-proxy.enzorua9.workers.dev/api/v2/bCBA/Titulos/${ticker}/Cotizacion/seriehistorica/${firstDate}/${today}/ajustada/sinAjustar`;
+        const r = await fetch(url, { headers: { Authorization: 'Bearer ' + tok } });
+        if (r.ok) {
+          const data = await r.json();
+          historicalPrices[ticker] = {};
+          if (Array.isArray(data)) {
+            data.forEach(d => {
+              const fecha = d.fechaHora ? d.fechaHora.split('T')[0] : d.fecha;
+              const precio = d.ultimoPrecio || d.ultimo || d.precioUltimo || 0;
+              if (fecha && precio > 0) historicalPrices[ticker][fecha] = precio;
+            });
+          }
+        }
+      } catch(e) { console.warn('Error fetching history for', ticker, e); }
+    }
+
+    // Fetch historical MEP (AL30D / AL30)
+    const mepHistory = {};
+    try {
+      const [rARS, rUSD] = await Promise.all([
+        fetch(`https://iol-proxy.enzorua9.workers.dev/api/v2/bCBA/Titulos/AL30D/Cotizacion/seriehistorica/${firstDate}/${today}/ajustada/sinAjustar`, { headers: { Authorization: 'Bearer ' + tok } }),
+        fetch(`https://iol-proxy.enzorua9.workers.dev/api/v2/bCBA/Titulos/AL30/Cotizacion/seriehistorica/${firstDate}/${today}/ajustada/sinAjustar`, { headers: { Authorization: 'Bearer ' + tok } }),
+      ]);
+      if (rARS.ok && rUSD.ok) {
+        const dARS = await rARS.json();
+        const dUSD = await rUSD.json();
+        const mapARS = {}, mapUSD = {};
+        if (Array.isArray(dARS)) dARS.forEach(d => { const f=d.fechaHora?.split('T')[0]; if(f) mapARS[f]=d.ultimoPrecio||d.ultimo||0; });
+        if (Array.isArray(dUSD)) dUSD.forEach(d => { const f=d.fechaHora?.split('T')[0]; if(f) mapUSD[f]=d.ultimoPrecio||d.ultimo||0; });
+        Object.keys(mapARS).forEach(f => {
+          if (mapARS[f] > 0 && mapUSD[f] > 0) {
+            const mep = mapARS[f] / mapUSD[f];
+            if (mep > 100) mepHistory[f] = mep;
+          }
+        });
+      }
+    } catch(e) { console.warn('Error fetching MEP history', e); }
+
+    // Build weekly snapshots
+    const snapshots = [];
+    const start = new Date(firstDate);
+    const end = new Date(today);
+    
+    // Get all available dates from price data (use weekly sampling)
+    const allAvailDates = new Set();
+    Object.values(historicalPrices).forEach(pd => Object.keys(pd).forEach(d => allAvailDates.add(d)));
+    const sortedDates = [...allAvailDates].sort();
+    
+    // Sample every ~7 days
+    let lastAdded = null;
+    for (const date of sortedDates) {
+      if (!lastAdded || (new Date(date) - new Date(lastAdded)) >= 6*24*3600*1000) {
+        // Calculate portfolio value on this date
+        // Only count compras that were made on or before this date
+        const comprasAtDate = state.compras.filter(c => !c.closed && c.fecha <= date);
+        if (comprasAtDate.length === 0) continue;
+
+        const mep = mepHistory[date] || state.mepActual || 1430;
+        let totalInv = 0, totalActual = 0;
+
+        // Group by ticker
+        const byTicker = {};
+        comprasAtDate.forEach(c => {
+          if (!byTicker[c.ticker]) byTicker[c.ticker] = { totalCantidad: 0, totalInvUSD: 0 };
+          byTicker[c.ticker].totalCantidad += c.cantidad;
+          byTicker[c.ticker].totalInvUSD += c.invUSD;
+        });
+
+        let hasAllPrices = true;
+        Object.entries(byTicker).forEach(([ticker, pos]) => {
+          totalInv += pos.totalInvUSD;
+          const priceData = historicalPrices[ticker];
+          // Find closest price on or before this date
+          if (priceData) {
+            const availDates = Object.keys(priceData).filter(d => d <= date).sort();
+            if (availDates.length > 0) {
+              const closestDate = availDates[availDates.length - 1];
+              const price = priceData[closestDate];
+              // CEDEARs D = price in USD
+              const isUSD = ticker.endsWith('D') && price < 5000;
+              const valueUSD = isUSD ? pos.totalCantidad * price : (pos.totalCantidad * price) / mep;
+              totalActual += valueUSD;
+            } else {
+              totalActual += pos.totalInvUSD; // fallback to cost
+            }
+          } else {
+            totalActual += pos.totalInvUSD;
+          }
+        });
+
+        snapshots.push({ date, totalInvUSD: Math.round(totalInv*100)/100, totalActualUSD: Math.round(totalActual*100)/100, mep });
+        lastAdded = date;
+      }
+    }
+
+    if (snapshots.length > 0) {
+      // Merge with existing snapshots (keep manual ones, add historical)
+      const existingDates = new Set(state.snapshots.map(s => s.date));
+      snapshots.forEach(s => { if (!existingDates.has(s.date)) state.snapshots.push(s); });
+      state.snapshots.sort((a,b) => a.date.localeCompare(b.date));
+      saveState();
+      renderEvolutionChart();
+      alert('✅ Evolución histórica calculada con ' + snapshots.length + ' puntos.');
+    } else {
+      alert('No se pudieron obtener precios históricos. Intentá más tarde.');
+    }
+
+  } catch(e) {
+    console.error(e);
+    alert('Error: ' + e.message);
+  }
+
+  btn.textContent = '📊 Reconstruir evolución histórica'; btn.disabled = false;
+}
+
 // ── UTILS ──
 function f2(n){if(n===null||n===undefined||isNaN(n))return'—';return Math.abs(n).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fn(n){return n.toLocaleString('es-AR',{maximumFractionDigits:4});}
