@@ -303,6 +303,11 @@ tbody tr:hover td{background:rgba(26,110,245,.025)}
       <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;font-weight:700">O usá sin conexión</div>
       <button class="btn-sm" onclick="skipLogin()" style="width:100%;padding:11px">Continuar en modo manual</button>
     </div>
+    <div style="margin-top:16px;padding:16px;background:rgba(14,201,158,.06);border:1px solid rgba(14,201,158,.2);border-radius:8px">
+      <div style="font-size:11px;font-weight:700;color:#0a9e7c;margin-bottom:6px">📥 Portafolio pre-cargado</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.6">Tus 22 operaciones del Excel ya están procesadas. Hacé clic para importarlas directamente.</div>
+      <button class="btn-sm" onclick="importarPortafolio()" style="width:100%;padding:11px;border-color:#0ec99e;color:#0a9e7c">✅ Importar mi portafolio (22 operaciones)</button>
+    </div>
   </div>
 </div>
 
@@ -559,11 +564,19 @@ async function fetchPrice(ticker) {
 async function fetchMEP() {
   try {
     const tok=await ensureToken();
-    for(const t of ['AL30D','GD30D','AY24D']) {
+    const pairs=[{ars:'AL30D',usd:'AL30'},{ars:'GD30D',usd:'GD30'}];
+    for(const pair of pairs) {
       try {
-        const r=await fetch(`https://iol-proxy.enzorua9.workers.dev/api/v2/bCBA/Titulos/${t}/Cotizacion`,
-          {headers:{Authorization:'Bearer '+tok}});
-        if(r.ok){const d=await r.json();const p=d.ultimoPrecio||d.ultimo||0;if(p>0)return p;}
+        const [rARS,rUSD]=await Promise.all([
+          fetch(`https://iol-proxy.enzorua9.workers.dev/api/v2/bCBA/Titulos/${pair.ars}/Cotizacion`,{headers:{Authorization:'Bearer '+tok}}),
+          fetch(`https://iol-proxy.enzorua9.workers.dev/api/v2/bCBA/Titulos/${pair.usd}/Cotizacion`,{headers:{Authorization:'Bearer '+tok}}),
+        ]);
+        if(rARS.ok&&rUSD.ok){
+          const dARS=await rARS.json();const dUSD=await rUSD.json();
+          const pARS=dARS.ultimoPrecio||dARS.ultimo||0;
+          const pUSD=dUSD.ultimoPrecio||dUSD.ultimo||0;
+          if(pARS>0&&pUSD>0){const mep=pARS/pUSD;if(mep>100)return mep;}
+        }
       }catch(e){}
     }
   }catch(e){}
@@ -886,6 +899,20 @@ function renderHistorial() {
   wrap.innerHTML=html;
 }
 
+
+// ── IMPORTAR PORTAFOLIO PRE-CARGADO ──
+function importarPortafolio() {
+  if (state.compras.length > 0) {
+    if (!confirm('Ya tenés ' + state.compras.length + ' compras cargadas. ¿Querés agregar las del Excel encima?')) return;
+  }
+  const data = [{"id": 1700000000000, "fecha": "2025-01-01", "activo": "Cedear", "ticker": "PYPLD", "broker": "IOL", "sector": "CEDEARs", "cantidad": 4.0, "precio": 11900.0, "mep": 1212.0, "comision": 0.0042, "invBruta": 47600.0, "comisionARS": 199.92, "invNeta": 47799.92, "invUSD": 39.4389, "closed": false}, {"id": 1700000001000, "fecha": "2025-10-10", "activo": "Cedear", "ticker": "MELID", "broker": "IOL", "sector": "CEDEARs", "cantidad": 7.0, "precio": 25220.0, "mep": 1380.0, "comision": 0.0042, "invBruta": 176540.0, "comisionARS": 741.47, "invNeta": 177281.47, "invUSD": 128.4648, "closed": false}, {"id": 1700000002000, "fecha": "2025-10-24", "activo": "Cedear", "ticker": "MELID", "broker": "IOL", "sector": "CEDEARs", "cantidad": 2.0, "precio": 27800.0, "mep": 1524.0, "comision": 0.0042, "invBruta": 55600.0, "comisionARS": 233.52, "invNeta": 55833.52, "invUSD": 36.6362, "closed": false}, {"id": 1700000003000, "fecha": "2025-10-31", "activo": "Cedear", "ticker": "JDD", "broker": "IOL", "sector": "CEDEARs", "cantidad": 40.0, "precio": 12300.0, "mep": 1448.0, "comision": 0.0042, "invBruta": 492000.0, "comisionARS": 2066.4, "invNeta": 494066.4, "invUSD": 341.2061, "closed": false}, {"id": 1700000004000, "fecha": "2026-04-23", "activo": "Cedear", "ticker": "IBMD", "broker": "IOL", "sector": "CEDEARs", "cantidad": 43.0, "precio": 22390.0, "mep": 1420.0, "comision": 0.0042, "invBruta": 962770.0, "comisionARS": 4043.63, "invNeta": 966813.63, "invUSD": 680.8547, "closed": false}, {"id": 1700000005000, "fecha": "2025-11-11", "activo": "Cedear", "ticker": "IBITD", "broker": "IOL", "sector": "CEDEARs", "cantidad": 150.0, "precio": 8670.0, "mep": 1451.0, "comision": 0.0042, "invBruta": 1300500.0, "comisionARS": 5462.1, "invNeta": 1305962.1, "invUSD": 900.0428, "closed": false}, {"id": 1700000006000, "fecha": "2026-04-10", "activo": "Cedear", "ticker": "MSFTD", "broker": "IOL", "sector": "CEDEARs", "cantidad": 107.0, "precio": 18270.0, "mep": 1412.0, "comision": 0.0042, "invBruta": 1954890.0, "comisionARS": 8210.54, "invNeta": 1963100.54, "invUSD": 1390.2978, "closed": false}, {"id": 1700000007000, "fecha": "2025-11-10", "activo": "Cedear", "ticker": "MELID", "broker": "IOL", "sector": "CEDEARs", "cantidad": 3.0, "precio": 25600.0, "mep": 1450.0, "comision": 0.0042, "invBruta": 76800.0, "comisionARS": 322.56, "invNeta": 77122.56, "invUSD": 53.188, "closed": false}, {"id": 1700000008000, "fecha": "2025-01-02", "activo": "Cedear", "ticker": "PYPLD", "broker": "IOL", "sector": "CEDEARs", "cantidad": 4.0, "precio": 11250.0, "mep": 1500.0, "comision": 0.0042, "invBruta": 45000.0, "comisionARS": 189.0, "invNeta": 45189.0, "invUSD": 30.126, "closed": false}, {"id": 1700000009000, "fecha": "2026-01-02", "activo": "Cedear", "ticker": "IBITD", "broker": "IOL", "sector": "CEDEARs", "cantidad": 1.0, "precio": 7880.0, "mep": 1501.0, "comision": 0.0042, "invBruta": 7880.0, "comisionARS": 33.1, "invNeta": 7913.1, "invUSD": 5.2719, "closed": false}, {"id": 1700000010000, "fecha": "2026-01-02", "activo": "Cedear", "ticker": "MELID", "broker": "IOL", "sector": "CEDEARs", "cantidad": 15.0, "precio": 25480.0, "mep": 1504.0, "comision": 0.0042, "invBruta": 382200.0, "comisionARS": 1605.24, "invNeta": 383805.24, "invUSD": 255.1897, "closed": false}, {"id": 1700000011000, "fecha": "2026-01-06", "activo": "Cedear", "ticker": "MSFTD", "broker": "IOL", "sector": "CEDEARs", "cantidad": 45.0, "precio": 24250.0, "mep": 1497.0, "comision": 0.0042, "invBruta": 1091250.0, "comisionARS": 4583.25, "invNeta": 1095833.25, "invUSD": 732.0195, "closed": false}, {"id": 1700000012000, "fecha": "2026-04-23", "activo": "Cedear", "ticker": "NOWD", "broker": "IOL", "sector": "CEDEARs", "cantidad": 135.0, "precio": 7250.0, "mep": 1375.0, "comision": 0.0042, "invBruta": 978750.0, "comisionARS": 4110.75, "invNeta": 982860.75, "invUSD": 714.8078, "closed": false}, {"id": 1700000013000, "fecha": "2026-04-17", "activo": "Cedear", "ticker": "NFLXD", "broker": "IOL", "sector": "CEDEARs", "cantidad": 334.0, "precio": 2945.0, "mep": 1400.0, "comision": 0.0042, "invBruta": 983630.0, "comisionARS": 4131.25, "invNeta": 987761.25, "invUSD": 705.5437, "closed": false}, {"id": 1700000014000, "fecha": "2026-01-22", "activo": "Cedear", "ticker": "MSFTD", "broker": "IOL", "sector": "CEDEARs", "cantidad": 20.0, "precio": 22620.0, "mep": 1458.5, "comision": 0.0042, "invBruta": 452400.0, "comisionARS": 1900.08, "invNeta": 454300.08, "invUSD": 311.4845, "closed": false}, {"id": 1700000015000, "fecha": "2026-04-14", "activo": "Cedear", "ticker": "NKED", "broker": "IOL", "sector": "CEDEARs", "cantidad": 374.0, "precio": 5275.0, "mep": 1392.0, "comision": 0.0042, "invBruta": 1972850.0, "comisionARS": 8285.97, "invNeta": 1981135.97, "invUSD": 1423.2299, "closed": false}, {"id": 1700000016000, "fecha": "2026-01-30", "activo": "Cedear", "ticker": "SLVD", "broker": "IOL", "sector": "CEDEARs", "cantidad": 31.0, "precio": 22890.0, "mep": 1460.0, "comision": 0.0042, "invBruta": 709590.0, "comisionARS": 2980.28, "invNeta": 712570.28, "invUSD": 488.0618, "closed": false}, {"id": 1700000017000, "fecha": "2026-01-30", "activo": "Cedear", "ticker": "GLDD", "broker": "IOL", "sector": "CEDEARs", "cantidad": 25.0, "precio": 14100.0, "mep": 1459.0, "comision": 0.0042, "invBruta": 352500.0, "comisionARS": 1480.5, "invNeta": 353980.5, "invUSD": 242.6186, "closed": false}, {"id": 1700000018000, "fecha": "2026-02-02", "activo": "Cedear", "ticker": "IBITD", "broker": "IOL", "sector": "CEDEARs", "cantidad": 74.0, "precio": 6690.0, "mep": 1457.0, "comision": 0.0042, "invBruta": 495060.0, "comisionARS": 2079.25, "invNeta": 497139.25, "invUSD": 341.2074, "closed": false}, {"id": 1700000019000, "fecha": "2026-02-04", "activo": "Cedear", "ticker": "IBITD", "broker": "IOL", "sector": "CEDEARs", "cantidad": 82.0, "precio": 6285.0, "mep": 1448.0, "comision": 0.0042, "invBruta": 515370.0, "comisionARS": 2164.55, "invNeta": 517534.55, "invUSD": 357.4134, "closed": false}, {"id": 1700000020000, "fecha": "2026-02-24", "activo": "Cedear", "ticker": "IBITD", "broker": "IOL", "sector": "CEDEARs", "cantidad": 95.0, "precio": 5185.0, "mep": 1401.0, "comision": 0.0042, "invBruta": 492575.0, "comisionARS": 2068.82, "invNeta": 494643.82, "invUSD": 353.0648, "closed": false}, {"id": 1700000021000, "fecha": "2026-03-18", "activo": "Cedear", "ticker": "SLVD", "broker": "IOL", "sector": "CEDEARs", "cantidad": 31.0, "precio": 17150.0, "mep": 1423.0, "comision": 0.0042, "invBruta": 531650.0, "comisionARS": 2232.93, "invNeta": 533882.93, "invUSD": 375.1813, "closed": false}];
+  data.forEach(c => state.compras.push(c));
+  state.manualMode = false;
+  saveState();
+  alert('✅ Se importaron ' + data.length + ' operaciones correctamente.');
+  showSection('dashboard');
+  refreshAll();
+}
 // ── UTILS ──
 function f2(n){if(n===null||n===undefined||isNaN(n))return'—';return Math.abs(n).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fn(n){return n.toLocaleString('es-AR',{maximumFractionDigits:4});}
