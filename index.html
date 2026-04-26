@@ -323,6 +323,38 @@ tbody tr:hover td{background:rgba(26,110,245,.025)}
     <div class="kpi"><div class="kpi-bar" style="background:linear-gradient(90deg,#1af5e0,#1a6ef5)"></div><div class="kpi-label">Dólar MEP</div><div class="kpi-value" id="kpi-mep">—</div><div class="kpi-sub" id="kpi-mep-sub">actualizar en config</div></div>
   </div>
 
+  <!-- LIQUIDEZ -->
+  <div class="grid-2" style="margin-bottom:20px">
+    <div class="card">
+      <div class="card-title"><div class="ico">💵</div>Liquidez disponible</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px">
+        <div>
+          <div class="kpi-label" style="margin-bottom:6px">En ARS</div>
+          <div style="font-size:20px;font-weight:800;color:var(--text)" id="liq-ars">—</div>
+        </div>
+        <div>
+          <div class="kpi-label" style="margin-bottom:6px">En USD</div>
+          <div style="font-size:20px;font-weight:800;color:var(--accent2)" id="liq-usd">—</div>
+        </div>
+        <div>
+          <div class="kpi-label" style="margin-bottom:6px">Total USD</div>
+          <div style="font-size:20px;font-weight:800;color:var(--accent)" id="liq-total">—</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn-sm" style="font-size:10px;padding:6px 14px" onclick="showMovModal('ingreso')">+ Ingreso</button>
+        <button class="btn-sm" style="font-size:10px;padding:6px 14px;border-color:#9b59f5;color:#9b59f5" onclick="showMovModal('retiro')">− Retiro</button>
+        <button class="btn-sm btn-danger" style="font-size:10px;padding:6px 14px" onclick="showMovModal('ajuste')">✎ Ajustar saldo</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><div class="ico">📋</div>Últimos movimientos</div>
+      <div id="mov-list" style="max-height:160px;overflow-y:auto">
+        <div class="empty" style="padding:20px"><p style="font-size:11px">Sin movimientos registrados</p></div>
+      </div>
+    </div>
+  </div>
+
   <!-- EVOLUTION CHART -->
   <div class="card" style="margin-bottom:20px">
     <div class="card-title"><div class="ico">📈</div>Evolución del portafolio</div>
@@ -431,6 +463,27 @@ tbody tr:hover td{background:rgba(26,110,245,.025)}
 
 </div>
 
+<!-- MODAL MOVIMIENTO -->
+<div class="modal-overlay" id="mov-modal">
+  <div class="modal">
+    <h3 id="mov-modal-title">Registrar movimiento</h3>
+    <p id="mov-modal-desc" style="color:var(--text2);font-size:12px;margin-bottom:22px;line-height:1.6"></p>
+    <div class="field"><label>Fecha</label><input type="date" id="mov-fecha"></div>
+    <div class="field"><label>Moneda</label>
+      <select id="mov-moneda">
+        <option value="ARS">Pesos (ARS)</option>
+        <option value="USD">Dólares (USD)</option>
+      </select>
+    </div>
+    <div class="field"><label>Monto</label><input type="number" id="mov-monto" placeholder="0.00" step="any"></div>
+    <div class="field"><label>Descripción (opcional)</label><input type="text" id="mov-descripcion" placeholder="Ej: Transferencia bancaria"></div>
+    <div class="modal-actions">
+      <button class="btn-sm" onclick="confirmMov()">Confirmar</button>
+      <button class="btn-sm btn-danger" onclick="closeMov()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── STATE ──
 let state = {
@@ -439,6 +492,8 @@ let state = {
   prices:{}, mepActual:null,
   iolUser:'', iolPass:'',
   defaultCommission:0.60, manualMode:false,
+  liquidezARS: 0, liquidezUSD: 0,
+  movimientos: [], // {id, fecha, tipo, monto, moneda, descripcion}
 };
 const SECTOR_COLORS = {
   "Bonos Soberanos":"#1a6ef5","Bonos CER":"#0ec99e","Letras":"#9b59f5",
@@ -451,6 +506,12 @@ let chartPortfolio=null, chartSector=null, chartEvolution=null;
 // ── INIT ──
 window.onload = () => {
   loadState();
+  // Pre-load initial liquidez if not set
+  if (!state.liquidezARS && !state.liquidezUSD) {
+    state.liquidezARS = 509300;
+    state.liquidezUSD = 379.37;
+    saveState();
+  }
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('c-fecha').value = today;
   document.getElementById('m-fecha').value = today;
@@ -465,6 +526,8 @@ function saveState() {
     compras:state.compras, cierres:state.cierres, snapshots:state.snapshots,
     mepActual:state.mepActual, iolUser:state.iolUser, iolPass:state.iolPass,
     defaultCommission:state.defaultCommission, manualMode:state.manualMode,
+    liquidezARS:state.liquidezARS, liquidezUSD:state.liquidezUSD,
+    movimientos:state.movimientos,
   }));
 }
 function loadState() {
@@ -474,6 +537,8 @@ function loadState() {
       compras:s.compras||[], cierres:s.cierres||[], snapshots:s.snapshots||[],
       mepActual:s.mepActual||null, iolUser:s.iolUser||'', iolPass:s.iolPass||'',
       defaultCommission:s.defaultCommission??0.60, manualMode:s.manualMode||false,
+      liquidezARS:s.liquidezARS||0, liquidezUSD:s.liquidezUSD||0,
+      movimientos:s.movimientos||[],
     });
     if (state.iolUser) document.getElementById('iol-user').value = state.iolUser;
     if (state.iolPass) document.getElementById('iol-pass').value = '••••••••';
@@ -548,8 +613,49 @@ function setConn(ok) {
   l.textContent=ok?'Conectado · IOL':'Error de conexión';
 }
 
-// ── PRICE FETCH ──
+// ── TICKER CONFIG: ratio y símbolo Yahoo ──
+const TICKER_CONFIG = {
+  'PYPLD':  { ratio:8,   yahoo:'PYPL' },
+  'MELID':  { ratio:120, yahoo:'MELI' },
+  'JDD':    { ratio:4,   yahoo:'JD'   },
+  'IBMD':   { ratio:15,  yahoo:'IBM'  },
+  'IBITD':  { ratio:10,  yahoo:'IBIT' },
+  'MSFTD':  { ratio:30,  yahoo:'MSFT' },
+  'SNOWD':  { ratio:30,  yahoo:'SNOW' },
+  'NFLXD':  { ratio:48,  yahoo:'NFLX' },
+  'NKED':   { ratio:12,  yahoo:'NKE'  },
+  'SLVD':   { ratio:6,   yahoo:'SLV'  },
+  'GLDD':   { ratio:50,  yahoo:'GLD'  },
+};
+
+// ── PRICE FETCH (Yahoo Finance via proxy) ──
 async function fetchPrice(ticker) {
+  const cfg = TICKER_CONFIG[ticker.toUpperCase()];
+  if (cfg) {
+    // Use Yahoo Finance for known CEDEARs
+    try {
+      const yahoo = cfg.yahoo;
+      const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${yahoo}?interval=1d&range=1d`);
+      if (r.ok) {
+        const d = await r.json();
+        const price = d?.chart?.result?.[0]?.meta?.regularMarketPrice || 0;
+        if (price > 0) return { price, mercado: 'yahoo', yahoo };
+      }
+    } catch(e) {}
+    // Fallback: try Yahoo via allorigins proxy
+    try {
+      const yahoo = cfg.yahoo;
+      const url = `https://query2.finance.yahoo.com/v8/finance/chart/${yahoo}?interval=1d&range=1d`;
+      const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
+      if (r.ok) {
+        const wrapper = await r.json();
+        const d = JSON.parse(wrapper.contents);
+        const price = d?.chart?.result?.[0]?.meta?.regularMarketPrice || 0;
+        if (price > 0) return { price, mercado: 'yahoo', yahoo };
+      }
+    } catch(e) {}
+  }
+  // Fallback: IOL for non-configured tickers
   try {
     const tok=await ensureToken();
     for(const m of ['bCBA','nYSE','nASDAQ']) {
@@ -641,28 +747,28 @@ function getConsolidated() {
     b.totalCantidad+=c.cantidad; b.totalInvUSD+=c.invUSD; b.totalInvARS+=c.invNeta; b.compras.push(c);
   });
   Object.values(byT).forEach(b=>{
+    const cfg = TICKER_CONFIG[b.ticker.toUpperCase()];
+    const ratio = cfg ? cfg.ratio : 1;
     const tot=b.compras.reduce((a,c)=>a+c.cantidad,0);
     b.precioPromARS=b.compras.reduce((a,c)=>a+c.precio*c.cantidad,0)/tot;
     b.mepProm=b.totalInvARS/b.totalInvUSD;
-    const pd=state.prices[b.ticker]; const cur=pd?pd.price:null; const mep=state.mepActual;
-    // CEDEARs con D (ej: MSFTD) cotizan en USD en IOL — precio ya viene en USD
-    const tickerEnUSD = b.ticker.endsWith('D') && cur && cur < 5000;
-    if(cur){
-      if(tickerEnUSD){
-        // precio en USD directamente
-        b.valorActualUSD=b.totalCantidad*cur;
-        b.currentPriceARS=mep ? cur*mep : null;
-      } else if(mep){
-        // precio en ARS, convertir por MEP
-        b.valorActualARS=b.totalCantidad*cur;
-        b.valorActualUSD=b.valorActualARS/mep;
-        b.currentPriceARS=cur;
-      }
-      if(b.valorActualUSD!=null){
-        b.gpUSD=b.valorActualUSD-b.totalInvUSD;
-        b.rendPct=b.gpUSD/b.totalInvUSD;
-      } else { b.valorActualUSD=null; b.gpUSD=null; b.rendPct=null; }
-    } else { b.valorActualUSD=null; b.gpUSD=null; b.rendPct=null; b.currentPriceARS=cur; }
+    // Acciones reales = cuotas / ratio
+    b.accionesReales = b.totalCantidad / ratio;
+    // Costo promedio real por acción en USD (con comisión ya incluida en invUSD)
+    b.costoPromedioUSD = b.accionesReales > 0 ? b.totalInvUSD / b.accionesReales : 0;
+    b.ratio = ratio;
+
+    const pd=state.prices[b.ticker]; const mep=state.mepActual;
+    if(pd && pd.price > 0){
+      const priceUSD = pd.mercado === 'yahoo' ? pd.price : (b.ticker.endsWith('D') ? pd.price : (mep ? pd.price/mep : null));
+      if(priceUSD){
+        b.precioActualUSD = priceUSD;
+        b.valorActualUSD = b.accionesReales * priceUSD;
+        b.gpUSD = b.valorActualUSD - b.totalInvUSD;
+        b.rendPct = b.gpUSD / b.totalInvUSD;
+        b.currentPriceARS = mep ? priceUSD * mep : null;
+      } else { b.precioActualUSD=null; b.valorActualUSD=null; b.gpUSD=null; b.rendPct=null; }
+    } else { b.precioActualUSD=null; b.valorActualUSD=null; b.gpUSD=null; b.rendPct=null; b.currentPriceARS=null; }
   });
   return Object.values(byT);
 }
@@ -692,7 +798,7 @@ function takeSnapshot() {
 // ── RENDER ALL ──
 function renderAll() {
   const c=getConsolidated();
-  renderKPIs(c); renderPortfolioTable(c); renderCharts(c); renderEvolutionChart();
+  renderKPIs(c); renderPortfolioTable(c); renderCharts(c); renderEvolutionChart(); renderLiquidez();
 }
 
 function renderKPIs(consolidated) {
@@ -723,12 +829,34 @@ function renderPortfolioTable(consolidated) {
     wrap.innerHTML='<div class="empty"><div class="empty-icon">📭</div><p>No hay posiciones abiertas.<br>Registrá tus compras en <strong>Compras</strong>.</p></div>';
     return;
   }
-  let html=`<table><thead><tr><th>Ticker</th><th>Activo</th><th>Sector</th><th>Cantidad</th><th>Precio prom.</th><th>Precio actual</th><th>Inv. USD</th><th>Valor actual</th><th>G/P USD</th><th>Rend.</th><th></th></tr></thead><tbody>`;
+  let html=`<table><thead><tr>
+    <th>Ticker</th><th>Yahoo</th><th>Sector</th>
+    <th>Cuotas</th><th>Acciones</th>
+    <th>Costo prom. USD</th><th>Precio actual USD</th>
+    <th>Inv. USD</th><th>Valor actual USD</th>
+    <th>G/P USD</th><th>Rend.</th><th></th>
+  </tr></thead><tbody>`;
   consolidated.forEach(b=>{
-    const gp=b.gpUSD!==null?`<span class="${b.gpUSD>=0?'pos':'neg'}">${b.gpUSD>=0?'+':''}USD ${f2(b.gpUSD)}</span>`:'<span style="color:var(--text3)">—</span>';
+    const cfg = TICKER_CONFIG[b.ticker.toUpperCase()];
+    const yahooSymbol = cfg ? `<span style="font-size:10px;color:var(--text3);font-weight:600">${cfg.yahoo}</span>` : '—';
+    const gp=b.gpUSD!==null?`<span class="${b.gpUSD>=0?'pos':'neg'}">${b.gpUSD>=0?'+':''}$${f2(b.gpUSD)}</span>`:'<span style="color:var(--text3)">—</span>';
     const rend=b.rendPct!==null?`<span class="badge ${b.rendPct>=0?'pos':'neg'}">${b.rendPct>=0?'+':''}${(b.rendPct*100).toFixed(2)}%</span>`:'—';
-    const pa=b.currentPriceARS?'$'+f2(b.currentPriceARS):`<input type="number" placeholder="ARS" style="width:90px;background:var(--bg);border:1.5px solid var(--border2);color:var(--text);padding:5px 9px;font-family:var(--font);font-size:12px;border-radius:5px;font-weight:600" onchange="setManualPrice('${b.ticker}',this.value)">`;
-    html+=`<tr><td style="color:var(--accent)">${b.ticker}</td><td>${b.activo}</td><td><span class="badge neutral">${b.sector}</span></td><td>${fn(b.totalCantidad)}</td><td>$${f2(b.precioPromARS)}</td><td>${pa}</td><td>USD ${f2(b.totalInvUSD)}</td><td>${b.valorActualUSD!==null?'USD '+f2(b.valorActualUSD):'<span style="color:var(--text3)">—</span>'}</td><td>${gp}</td><td>${rend}</td><td><button class="btn-sm" style="font-size:10px;padding:5px 12px" onclick="openCloseModal('${b.ticker}')">Cerrar</button></td></tr>`;
+    const precioActual = b.precioActualUSD
+      ? `<span style="font-weight:700;color:var(--text)">$${f2(b.precioActualUSD)}</span>`
+      : `<input type="number" placeholder="USD" style="width:80px;background:var(--bg);border:1.5px solid var(--border2);color:var(--text);padding:5px 9px;font-family:var(--font);font-size:12px;border-radius:5px;font-weight:600" onchange="setManualPriceUSD('${b.ticker}',this.value)">`;
+    html+=`<tr>
+      <td style="color:var(--accent);font-weight:800">${b.ticker}</td>
+      <td>${yahooSymbol}</td>
+      <td><span class="badge neutral">${b.sector}</span></td>
+      <td>${fn(b.totalCantidad)}</td>
+      <td style="color:var(--text2)">${b.accionesReales?f2(b.accionesReales):'—'}</td>
+      <td style="color:var(--text2)">$${f2(b.costoPromedioUSD)}</td>
+      <td>${precioActual}</td>
+      <td>$${f2(b.totalInvUSD)}</td>
+      <td>${b.valorActualUSD!==null?'$'+f2(b.valorActualUSD):'<span style="color:var(--text3)">—</span>'}</td>
+      <td>${gp}</td><td>${rend}</td>
+      <td><button class="btn-sm" style="font-size:10px;padding:5px 12px" onclick="openCloseModal('${b.ticker}')">Cerrar</button></td>
+    </tr>`;
   });
   html+='</tbody></table>';
   wrap.innerHTML=html;
@@ -737,6 +865,7 @@ function renderPortfolioTable(consolidated) {
   }
 }
 function setManualPrice(ticker,value){const v=parseFloat(value);if(v>0){state.prices[ticker]={price:v,mercado:'manual'};renderAll();}}
+function setManualPriceUSD(ticker,value){const v=parseFloat(value);if(v>0){state.prices[ticker]={price:v,mercado:'yahoo'};renderAll();}}
 function setMEP(value){const v=parseFloat(value);if(v>0){state.mepActual=v;saveState();renderAll();}}
 
 // ── CHARTS ──
@@ -754,6 +883,10 @@ function renderPortfolioChart(c) {
   const ctx=document.getElementById('chart-portfolio').getContext('2d');
   const data=c.map(b=>b.valorActualUSD||b.totalInvUSD);
   const labels=c.map(b=>b.ticker);
+  // Add liquidez to pie chart
+  const mep = state.mepActual || 1430;
+  const liqTotal = state.liquidezUSD + (state.liquidezARS / mep);
+  if (liqTotal > 0) { data.push(liqTotal); labels.push('💵 LIQUIDEZ'); }
   const total=data.reduce((a,b)=>a+b,0);
   if(chartPortfolio)chartPortfolio.destroy();
   if(!c.length)return;
@@ -945,7 +1078,13 @@ async function buildHistoricalEvolution() {
     // Date range: first purchase to today
     const allDates = state.compras.filter(c=>!c.closed).map(c=>c.fecha).filter(d=>d&&d.length===10);
     const firstDate = allDates.sort()[0];
-    const today = new Date().toISOString().split('T')[0];
+    // Pre-load initial liquidez if not set
+  if (!state.liquidezARS && !state.liquidezUSD) {
+    state.liquidezARS = 509300;
+    state.liquidezUSD = 379.37;
+    saveState();
+  }
+  const today = new Date().toISOString().split('T')[0];
 
     // Fetch historical prices for each ticker
     const historicalPrices = {}; // { ticker: { date: price } }
@@ -1064,6 +1203,76 @@ async function buildHistoricalEvolution() {
   }
 
   btn.textContent = '📊 Reconstruir evolución histórica'; btn.disabled = false;
+}
+
+
+// ── LIQUIDEZ ──
+let movModalTipo = 'ingreso';
+
+function showMovModal(tipo) {
+  movModalTipo = tipo;
+  const titles = {ingreso:'💵 Registrar ingreso', retiro:'💸 Registrar retiro', ajuste:'✎ Ajustar saldo'};
+  const descs = {
+    ingreso:'Ingresá el dinero que transferiste al broker.',
+    retiro:'Registrá un retiro de fondos del broker.',
+    ajuste:'Sobrescribí el saldo actual directamente.',
+  };
+  document.getElementById('mov-modal-title').textContent = titles[tipo];
+  document.getElementById('mov-modal-desc').textContent = descs[tipo];
+  document.getElementById('mov-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('mov-monto').value = '';
+  document.getElementById('mov-descripcion').value = '';
+  if (tipo === 'ajuste') {
+    document.getElementById('mov-moneda').value = 'ARS';
+  }
+  document.getElementById('mov-modal').classList.add('open');
+}
+function closeMov() { document.getElementById('mov-modal').classList.remove('open'); }
+
+function confirmMov() {
+  const fecha = document.getElementById('mov-fecha').value;
+  const moneda = document.getElementById('mov-moneda').value;
+  const monto = parseFloat(document.getElementById('mov-monto').value);
+  const desc = document.getElementById('mov-descripcion').value.trim();
+  if (!fecha || !monto || monto <= 0) { alert('Completá fecha y monto.'); return; }
+
+  if (movModalTipo === 'ajuste') {
+    // Direct override
+    if (moneda === 'ARS') state.liquidezARS = monto;
+    else state.liquidezUSD = monto;
+  } else {
+    const signo = movModalTipo === 'ingreso' ? 1 : -1;
+    if (moneda === 'ARS') state.liquidezARS = Math.max(0, state.liquidezARS + signo * monto);
+    else state.liquidezUSD = Math.max(0, state.liquidezUSD + signo * monto);
+    state.movimientos.push({
+      id: Date.now(), fecha, tipo: movModalTipo,
+      monto: signo * monto, moneda, descripcion: desc,
+    });
+  }
+  saveState(); closeMov(); renderLiquidez(); renderCharts(getConsolidated());
+}
+
+function renderLiquidez() {
+  const mep = state.mepActual || 1430;
+  const liqUSDtotal = state.liquidezUSD + (state.liquidezARS / mep);
+  document.getElementById('liq-ars').textContent = '$' + f2(state.liquidezARS) + ' ARS';
+  document.getElementById('liq-usd').textContent = 'USD ' + f2(state.liquidezUSD);
+  document.getElementById('liq-total').textContent = 'USD ' + f2(liqUSDtotal);
+
+  const movList = document.getElementById('mov-list');
+  const movs = [...state.movimientos].sort((a,b) => b.fecha.localeCompare(a.fecha)).slice(0,8);
+  if (!movs.length) {
+    movList.innerHTML = '<div class="empty" style="padding:20px"><p style="font-size:11px">Sin movimientos registrados</p></div>';
+    return;
+  }
+  movList.innerHTML = movs.map(m => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:11px">
+      <div>
+        <span style="font-weight:700;color:${m.monto>=0?'var(--green)':'var(--red)'}">${m.monto>=0?'+':''}${m.moneda === 'ARS' ? '$' : 'USD '}${f2(Math.abs(m.monto))}</span>
+        <span style="color:var(--text3);margin-left:8px">${m.moneda}</span>
+      </div>
+      <div style="color:var(--text3)">${m.fecha}</div>
+    </div>`).join('');
 }
 
 // ── UTILS ──
